@@ -1,0 +1,102 @@
+WITH ranked_refi AS (
+    SELECT
+        lbi.id AS Lead_ID,
+        lbi.name AS Customer_Name,
+        lbi.mobile AS Customer_Mobile,
+        lbi.lead_assigned AS Lead_Assigned_ID,
+        ua.name AS Lead_Assigned_By,
+        uloc.name AS Lead_Assigned_Location,
+        uloc.region AS Lead_Assigned_Region,
+        lbi.AgreementNo AS Agreement_No,
+        lac.id AS Checklist_Record_ID,
+        lac.pdf_file_url AS PDF_File_URL,
+        lac.questions_data,
+        lac.created_at AS RE_FI_Created_At,
+        um.name AS RE_FI_Submitted_By,
+        fsh.latitude AS Latitude,
+        fsh.longitude AS Longitude,
+        fsh.address AS Address,
+        fsh.status AS Status,
+        fsh.created_at AS RE_FI_Submitted_At,
+        rfh.id AS RE_FI_Review_ID,
+        rfh.review AS RE_FI_Review,
+        rfh.remarks AS RE_FI_Remarks,
+        rfh.userRoleType AS RE_FI_UserRoleType,
+        rfh.created_by AS RE_FI_Reviewed_By_ID,
+        urm.name AS RE_FI_Reviewed_By,
+        rfh.created_at AS RE_FI_Reviewed_At,
+        ROW_NUMBER() OVER (
+            PARTITION BY lbi.id
+            ORDER BY fsh.created_at DESC, lac.created_at DESC
+        ) AS rn
+    FROM tbl_lead_basic_info AS lbi
+    INNER JOIN tbl_lead_assigned_checklists AS lac
+        ON lac.lead_id = lbi.id
+        AND lac.checklist_id = 33
+        AND lac.section_name = 'RE-FI'
+    LEFT JOIN tbl_fi_save_history AS fsh
+        ON fsh.checklist_id = lac.id
+        AND fsh.action = 'complete'
+    LEFT JOIN tbl_user_master AS um
+        ON fsh.created_by = um.user_id
+    LEFT JOIN tbl_user_master AS ua
+        ON lbi.lead_assigned = ua.user_id
+    LEFT JOIN tbl_locations_master AS uloc
+        ON ua.location_id = uloc.id
+    LEFT JOIN tbl_ri_fi_review_history AS rfh
+        ON rfh.lead_id = lbi.id
+    LEFT JOIN tbl_user_master AS urm
+        ON rfh.created_by = urm.user_id
+    WHERE lbi.re_fi_checklist_status = 1
+)
+
+SELECT
+    rd.Lead_ID,
+    rd.Customer_Name,
+    rd.Customer_Mobile,
+    rd.Lead_Assigned_By,
+    rd.Lead_Assigned_Location,
+    rd.Lead_Assigned_Region,
+    rd.Agreement_No,
+    rd.Checklist_Record_ID,
+    rd.PDF_File_URL,
+    rd.RE_FI_Created_At,
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Loan Agreement Number')),'.questionText','.userAnswers[0]')))), '') AS "Loan Agreement Number",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Location')),'.questionText','.userAnswers[0]')))), '') AS "Location",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Product Category')),'.questionText','.userAnswers[0]')))), '') AS "Product Category",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Product Type')),'.questionText','.userAnswers[0]')))), '') AS "Product Type",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Current Address as per CAM visited?')),'.questionText','.userAnswers[0]')))), '') AS "Current Address CAM",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Account Status')),'.questionText','.userAnswers[0]')))), '') AS "Account Status",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Neighbour feedback  In case Skip or OD Case')),'.questionText','.userAnswers[0]')))), '') AS "Neighbour Feedback",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Profile- Investor')),'.questionText','.userAnswers[0]')))), '') AS "Profile Investor",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Vehicle is being used by Customer or 3rd Party')),'.questionText','.userAnswers[0]')))), '') AS "Vehicle Usage",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Third party Name')),'.questionText','.userAnswers[0]')))), '') AS "Third Party Name",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Third Party Address')),'.questionText','.userAnswers[0]')))), '') AS "Third Party Address",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Third party Phone number')),'.questionText','.userAnswers[0]')))), '') AS "Third Party Phone",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Deployment')),'.questionText','.userAnswers[0]')))), '') AS "Deployment",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Vehicle Reading in KM')),'.questionText','.userAnswers[0]')))), '') AS "Vehicle Reading in KM",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Monthly earning/ Viability')),'.questionText','.userAnswers[0]')))), '') AS "Monthly Earning Viability",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Any Performance issue with the Vehicle')),'.questionText','.userAnswers[0]')))), '') AS "Vehicle Performance Issue",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Current Address of Guarantor as per CAM visited? Is it same ? If No Please mention the address')),'.questionText','.userAnswers[0]')))), '') AS "Guarantor Address Verified",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Guarantor Visited Address')),'.questionText','.userAnswers[0]')))), '') AS "Guarantor Visited Address",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Who is the Relationship Manager of Ckers?')),'.questionText','.userAnswers[0]')))), '') AS "Relationship Manager",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Overall Ckers Feedback')),'.questionText','.userAnswers[0]')))), '') AS "Overall Ckers Feedback",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Do you want to refer someone for a loan?')),'.questionText','.userAnswers[0]')))), '') AS "Refer Someone For Loan?",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Person name whom you want to refer?')),'.questionText','.userAnswers[0]')))), '') AS "Refer Person Name",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Person contact details who you want to refer?')),'.questionText','.userAnswers[0]')))), '') AS "Refer Person Contact",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Overall Feedback About the Visit for Customer')),'.questionText','.userAnswers[0]')))), '') AS "Overall Feedback Customer",
+    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(rd.questions_data, CONCAT(REPLACE(JSON_UNQUOTE(JSON_SEARCH(rd.questions_data,'one','Overall Feedback About the Visit for Guarantor/Co applicant')),'.questionText','.userAnswers[0]')))), '') AS "Overall Feedback Guarantor",
+    rd.RE_FI_Submitted_By,
+    rd.RE_FI_Submitted_At,
+    rd.Latitude,
+    rd.Longitude,
+    rd.Address,
+    rd.Status,
+    rd.RE_FI_Review_ID,
+    rd.RE_FI_Review,
+    rd.RE_FI_Remarks,
+    rd.RE_FI_UserRoleType,
+    rd.RE_FI_Reviewed_By,
+    rd.RE_FI_Reviewed_At
+FROM ranked_refi rd
+WHERE rd.rn = 1
